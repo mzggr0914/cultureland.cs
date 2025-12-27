@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "TestConsole": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false,
+      "nativeDebugging": true
+    },
+    "프로필 1": {
+      "commandName": "Project"
+    }
+  }
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="cultureland.cs/cultureland.cs.csproj" />
+  <Project Path="TestConsole/TestConsole.csproj" />
+</Solution>

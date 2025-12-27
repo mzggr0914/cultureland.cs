@@ -1,0 +1,46 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+	<Version>3.0.1-dev.2</Version>
+	<Authors>kjm0914</Authors>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Description>컬쳐랜드 모바일웹을 자동화해주는 비공식 라이브러리입니다.</Description>
+    <PackageProjectUrl>https://github.com/mzggr0914/cultureland.cs</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/mzggr0914/cultureland.cs</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>cultureland;컬쳐랜드;자동화;culture;문상</PackageTags>
+    <Copyright>GPL-3.0-only</Copyright>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <NoWarn />
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <NoWarn />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE.txt">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.12.4" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="RestSharp" Version="113.0.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.1" />
+  </ItemGroup>
+
+</Project>
