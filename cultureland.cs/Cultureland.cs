@@ -126,7 +126,6 @@ namespace cultureland.cs
                     throw new CulturelandError(CulturelandErrorNames.LoginError, errorMessageMatch.Groups[1].Value.Replace("\\n\\n", ". "));
                 }
                 throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
-                //cultureland.cs.CulturelandError: '잘못된 응답이 반환되었습니다.'
             }
             var url = loginRequest.GetHeaderValue("Location");
             if (url == "/cmp/authConfirm.do")
@@ -249,7 +248,6 @@ namespace cultureland.cs
             var parsedResults = doc.DocumentNode
                 .Descendants("tbody").First()
                 .Descendants("tr").ToList();
-            //System.InvalidOperationException: 'Sequence contains no elements'
             var results = new List<CulturelandCharge>();
 
             for (int i = 0; i < pins.Count; i++)
