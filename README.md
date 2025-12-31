@@ -14,3 +14,7 @@
 도움이 필요하시면 아래 서버에서 도움을 요청해 보세요!<br>
 라이브러리 문서도 디스코드 서버에서 제공됩니다!<br>
 [Discord xB2Jae97z7](https://discord.gg/xB2Jae97z7)
+
+## 라이선스
+이 라이브러리는 https://github.com/Advanxing/cultureland.js
+프로젝트를 기반으로 하고 있습니다.
