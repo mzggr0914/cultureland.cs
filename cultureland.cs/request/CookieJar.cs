@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Web;
+using System.Net;
 
 namespace cultureland.cs.request
 {
@@ -13,113 +13,131 @@ namespace cultureland.cs.request
 
         public CookieJar(List<Cookie> cookies)
         {
-            _cookies = cookies;
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
+            _cookies = new List<Cookie>(cookies.Where(c => c != null));
         }
 
-        // 저장된 쿠키 반환
         public List<Cookie> Cookies => _cookies;
 
-        // 쿠키 가져오기
         public string Get(string key)
         {
-            var cookie = _cookies.FirstOrDefault(c => c.key == key);
-            if (cookie != null)
-                return cookie.value;
-            else
-                return string.Empty;
+            if (string.IsNullOrEmpty(key)) return string.Empty;
+            var cookie = _cookies.FirstOrDefault(c => c != null && string.Equals(c.key, key, StringComparison.Ordinal));
+            return cookie?.value ?? string.Empty;
         }
 
-        // 쿠키 추가
         public void Add(string cookie)
         {
-            Cookie parsedCookie = Parse(cookie);
-            if (parsedCookie != null)
-            {
-                Add(new List<Cookie> { parsedCookie });
-            }
+            if (string.IsNullOrWhiteSpace(cookie)) return;
+            Add(new List<Cookie> { Parse(cookie) });
         }
 
         public void Add(List<string> cookies)
         {
-            List<Cookie> parsedCookies = Parse(cookies);
-            Add(parsedCookies);
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
+            Add(Parse(cookies));
         }
 
         public void Add(Cookie cookie)
         {
+            if (cookie == null) throw new ArgumentNullException(nameof(cookie));
             Add(new List<Cookie> { cookie });
         }
 
         public void Add(List<Cookie> cookies)
         {
-            if (cookies == null)
-                throw new ArgumentNullException(nameof(cookies));
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
 
-            var reversed = cookies.AsEnumerable().Reverse().ToList();
-            cookies = cookies.Where((cookie, i) =>
-                i == (cookies.Count - 1) - reversed.FindIndex(c => c.key == cookie.key)).ToList();
+            var normalized = cookies
+                .Where(c => c != null && !string.IsNullOrEmpty(c.key))
+                .ToList();
 
-            foreach (var cookie in cookies)
-            {
-                Remove(cookie.key);
-            }
+            if (normalized.Count == 0) return;
 
-            _cookies.AddRange(cookies);
+            var distinctLast = normalized
+                .GroupBy(c => c.key, StringComparer.Ordinal)
+                .Select(g => g.Last())
+                .ToList();
+
+            foreach (var c in distinctLast)
+                Remove(c.key);
+
+            _cookies.AddRange(distinctLast);
         }
 
-        // 쿠키 설정 (모든 쿠키 덮어쓰기)
         public void Set(string cookie)
         {
-            Cookie parsedCookie = Parse(cookie);
-            _cookies = parsedCookie != null ? new List<Cookie> { parsedCookie } : new List<Cookie>();
+            _cookies = new List<Cookie>();
+            if (string.IsNullOrWhiteSpace(cookie)) return;
+            _cookies.Add(Parse(cookie));
         }
 
         public void Set(List<string> cookies)
         {
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
             _cookies = Parse(cookies);
         }
 
         public void Set(Cookie cookie)
         {
+            if (cookie == null) throw new ArgumentNullException(nameof(cookie));
             _cookies = new List<Cookie> { cookie };
         }
 
         public void Set(List<Cookie> cookies)
         {
-            _cookies = cookies;
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
+            _cookies = new List<Cookie>(cookies.Where(c => c != null));
         }
 
         public bool Remove(string key)
         {
-            var removed = _cookies.RemoveAll(c => c.key == key);
-            return removed > 0;
+            if (string.IsNullOrEmpty(key)) return false;
+            return _cookies.RemoveAll(c => c != null && string.Equals(c.key, key, StringComparison.Ordinal)) > 0;
         }
 
         public override string ToString()
         {
             return string.Join("; ",
-                _cookies.Select(c =>
-                    $"{Uri.EscapeDataString(c.key)}={Uri.EscapeDataString(c.value)}".Replace("%20", "+")
-                )
+                _cookies
+                    .Where(c => c != null && c.key != null)
+                    .Select(c =>
+                    {
+                        var k = Uri.EscapeDataString(c.key ?? string.Empty);
+                        var v = Uri.EscapeDataString(c.value ?? string.Empty);
+                        return $"{k}={v}".Replace("%20", "+");
+                    })
             );
         }
 
         public static Cookie Parse(string cookie)
         {
-            var first = cookie.Split(';')[0];
-            var parts = first.Split('=');
-            if (parts.Length < 2) throw new ArgumentException("Invalid cookie format", nameof(cookie));
-            var key = HttpUtility.UrlDecode(parts[0]);
-            var value = HttpUtility.UrlDecode(string.Join("=", parts.Skip(1)));
+            if (string.IsNullOrWhiteSpace(cookie))
+                throw new ArgumentException("Cookie string is null/empty.", nameof(cookie));
+
+            var first = cookie.Split(';')[0].Trim();
+            var parts = first.Split(new[] { '=' }, 2);
+
+            if (parts.Length != 2)
+                throw new ArgumentException("Invalid cookie format. Expected 'key=value'.", nameof(cookie));
+
+            var key = WebUtility.UrlDecode(parts[0]) ?? string.Empty;
+            var value = WebUtility.UrlDecode(parts[1]) ?? string.Empty;
+
             return new Cookie { key = key, value = value };
         }
 
         public static List<Cookie> Parse(List<string> cookies)
         {
-            if (cookies == null)
-                throw new ArgumentNullException(nameof(cookies));
-            var data = cookies.Select(Parse).Where(c => c != null).ToList();
-            return data;
+            if (cookies == null) throw new ArgumentNullException(nameof(cookies));
+
+            var result = new List<Cookie>();
+            foreach (var c in cookies)
+            {
+                if (string.IsNullOrWhiteSpace(c)) continue;
+                result.Add(Parse(c));
+            }
+            return result;
         }
     }
 }

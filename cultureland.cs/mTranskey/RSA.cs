@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -34,8 +33,8 @@ MRkVnInsKo2fzW+QNPrOzwO/yOsB/0bY+iQHLSpNYF3YRllCiE8L8XU=
         {
             var cert = new X509Certificate2(Encoding.ASCII.GetBytes(CULTURELAND_PUBLICKEY));
             System.Security.Cryptography.RSA rsa = cert.GetRSAPublicKey();
-			byte[] encryptedBytes = rsa.Encrypt(Encoding.UTF8.GetBytes(text), RSAEncryptionPadding.OaepSHA1);
-			return BitConverter.ToString(encryptedBytes).Replace("-", "").ToLowerInvariant()[..512];
-		}
+            byte[] encryptedBytes = rsa.Encrypt(Encoding.UTF8.GetBytes(text), RSAEncryptionPadding.OaepSHA1);
+            return BitConverter.ToString(encryptedBytes).Replace("-", "").ToLowerInvariant()[..512];
+        }
     }
 }
