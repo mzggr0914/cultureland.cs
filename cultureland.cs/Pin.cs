@@ -55,14 +55,11 @@ namespace cultureland.cs
             n = 0;
             if (string.IsNullOrWhiteSpace(pin)) return false;
 
-            for (int i = 0; i < pin.Length; i++)
+            foreach (var ch in pin)
             {
-                char ch = pin[i];
-                if ((uint)(ch - '0') <= 9)
-                {
-                    if (n == digits.Length) return false;
-                    digits[n++] = ch;
-                }
+                if ((uint)(ch - '0') > 9) continue;
+                if (n == digits.Length) return false;
+                digits[n++] = ch;
             }
 
             return n == 16 || n == 18;

@@ -329,12 +329,7 @@ namespace cultureland.cs.mTranskey
             int i = 0;
             for (; i < geo.Length; i++)
             {
-                if (geo[i] == 'l' || geo[i] == 'u' || geo[i] == 's' || geo[i] == 'd')
-                {
-                    inData[i] = geo[i];
-                    continue;
-                }
-                else if (geo[i] == ' ')
+                if (geo[i] == 'l' || geo[i] == 'u' || geo[i] == 's' || geo[i] == 'd' || geo[i] == ' ')
                 {
                     inData[i] = geo[i];
                     continue;

@@ -8,6 +8,7 @@ using System.Net.Http;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
+using HtmlAgilityPack;
 
 namespace cultureland.cs.request
 {
@@ -67,23 +68,30 @@ namespace cultureland.cs.request
 
         private async Task RequestRedirectUrl(RestResponse response)
         {
-            if (!(response.StatusCode == HttpStatusCode.Redirect ||
-                response.StatusCode == HttpStatusCode.MovedPermanently ||
-                response.StatusCode == HttpStatusCode.SeeOther)) return;
-            var locationHeader = (response.Headers.First(h => h.Name == "Location")?.Value) ?? throw new Exception("Redirect location not found");
-            var location = locationHeader.ToString();
-            var redirectRequest = new RestRequest(location, Method.Get);
-
-            if (response.StatusCode == HttpStatusCode.TemporaryRedirect ||
-                response.StatusCode == HttpStatusCode.PermanentRedirect)
+            while (true)
             {
-                redirectRequest = new RestRequest(location, response.Request.Method);
+                if (!(response.StatusCode == HttpStatusCode.Redirect 
+                  || response.StatusCode == HttpStatusCode.MovedPermanently 
+                  || response.StatusCode == HttpStatusCode.SeeOther) 
+                  || response.Headers is null) return;
+
+                var location = response.Headers
+                    .FirstOrDefault(h => h.Name == "Location")
+                    ?.Value;
+
+                if (location is null)
+                    break;
+
+                var redirectRequest = new RestRequest(location);
+
+                if (response.StatusCode == HttpStatusCode.TemporaryRedirect || response.StatusCode == HttpStatusCode.PermanentRedirect)
+                    redirectRequest = new RestRequest(location, response.Request.Method);
+
+                redirectRequest.AddHeader("cookie", CookieJar.ToString());
+                var redirectResponse = await Client.ExecuteAsync(redirectRequest);
+                CookieJar.Add(CookieJar.Parse(redirectResponse.GetHeaderValues("Set-Cookie").ToList()));
+                response = redirectResponse;
             }
-            redirectRequest.AddHeader("cookie", CookieJar.ToString());
-            var redirectResponse = await Client.ExecuteAsync(redirectRequest);
-            CookieJar.Add(CookieJar.Parse(redirectResponse.GetHeaderValues("Set-Cookie").ToList()));
-            if (redirectResponse.GetHeaderValue("Location") != null)
-                await RequestRedirectUrl(redirectResponse);
         }
 
         public async Task<RestResponse> GetAsync(string resource, Dictionary<string, string> queryStrings = null, Dictionary<string, string> headers = null, bool allowRedirects = true)

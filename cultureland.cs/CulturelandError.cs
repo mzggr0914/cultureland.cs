@@ -8,12 +8,7 @@ namespace cultureland.cs
     /// </summary>
     public class CulturelandError : Exception
     {
-        private readonly CulturelandErrorNames _name;
-
-        /// <summary>
-        /// 오류 이름
-        /// </summary>
-        public CulturelandErrorNames Name => _name;
+        public CulturelandErrorNames Name { get; }
 
         /// <summary>
         /// 커스텀 오류 클래스의 생성자입니다.
@@ -24,7 +19,7 @@ namespace cultureland.cs
         public CulturelandError(CulturelandErrorNames name, string message, object additionalValues = null)
             : base(message)
         {
-            _name = name;
+            Name = name;
             AdditionalValues = additionalValues;
         }
 

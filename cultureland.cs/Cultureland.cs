@@ -17,13 +17,13 @@ namespace cultureland.cs
 {
     public class Cultureland
     {
-        public FetchClient client;
-        public CulturelandUser userInfo;
-        public string keepLoginInfo;
+        public FetchClient Client;
+        public CulturelandUser UserInfo;
+        public string KeepLoginInfo;
 
         public Cultureland(string proxyAddress = null, string certificatePath = null)
         {
-            client = new FetchClient(proxyAddress, certificatePath);
+            Client = new FetchClient(proxyAddress, certificatePath);
         }
 
         public async Task<CulturelandUser> GetUserInfoAsync()
@@ -31,35 +31,35 @@ namespace cultureland.cs
             if (!await IsLoginAsync())
                 throw new CulturelandError(CulturelandErrorNames.LoginRequiredError, "로그인이 필요한 서비스 입니다.");
 
-            var userInfoResponse = await client.PostAsync("tgl/flagSecCash.json");
+            var userInfoRequest = await Client.PostAsync("tgl/flagSecCash.json");
 
-            if (!userInfoResponse.IsSuccessStatusCode)
+            if (!userInfoRequest.IsSuccessStatusCode || userInfoRequest.Content is null)
                 throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
 
-            var userInfo = JsonConvert.DeserializeObject<UserInfoResponse>(userInfoResponse.Content);
+            var userInfoResponse = JsonConvert.DeserializeObject<UserInfoResponse>(userInfoRequest.Content);
 
-            if (userInfo?.resultMessage != "성공")
-                throw new CulturelandError(CulturelandErrorNames.LookupError, userInfo?.resultMessage ?? "잘못된 응답이 반환되었습니다.");
+            if (userInfoResponse?.resultMessage != "성공")
+                throw new CulturelandError(CulturelandErrorNames.LookupError, userInfoResponse?.resultMessage ?? "잘못된 응답이 반환되었습니다.");
 
             return new CulturelandUser
             {
-                phone = userInfo.Phone,
-                safeLevel = int.Parse(userInfo.SafeLevel),
-                safePassword = userInfo.CashPwd != "0",
-                registerDate = new DateTimeOffset(DateTime.ParseExact(userInfo.RegDate, "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)).ToUnixTimeMilliseconds(),
-                userId = userInfo.userId,
-                userKey = userInfo.userKey,
-                userIp = userInfo.userIp,
-                index = int.Parse(userInfo.idx),
-                category = userInfo.category
+                phone = userInfoResponse.Phone,
+                safeLevel = int.Parse(userInfoResponse.SafeLevel),
+                safePassword = userInfoResponse.CashPwd != "0",
+                registerDate = new DateTimeOffset(DateTime.ParseExact(userInfoResponse.RegDate, "yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)).ToUnixTimeMilliseconds(),
+                userId = UserInfo.userId,
+                userKey = UserInfo.userKey,
+                userIp = UserInfo.userIp,
+                index = int.Parse(userInfoResponse.idx),
+                category = UserInfo.category
             };
         }
 
         public async Task<bool> IsLoginAsync()
         {
-            var isLoginResponse = await client.PostAsync("mmb/isLogin.json");
+            var isLoginResponse = await Client.PostAsync("mmb/isLogin.json");
 
-            if (!isLoginResponse.IsSuccessStatusCode)
+            if (isLoginResponse.Content is null || !isLoginResponse.IsSuccessStatusCode)
                 throw new CulturelandError(CulturelandErrorNames.ResponseError, "Failed to check login status.");
 
             var isLogin = JsonConvert.DeserializeObject<bool>(isLoginResponse.Content);
@@ -67,30 +67,27 @@ namespace cultureland.cs
             return isLogin;
         }
 
-        private class Credentials
-        {
-            public string Id { get; set; }
-            public string Password { get; set; }
-        }
-
         public async Task<CulturelandLogin> LoginAsync(string keepLoginInfo)
         {
             keepLoginInfo = HttpUtility.UrlDecode(keepLoginInfo);
 
-            client.CookieJar.Add(new Cookie()
+            Client.CookieJar.Add(new Cookie()
             {
                 key = "KeepLoginConfig",
                 value = keepLoginInfo
             });
-            var loginMainRequest = await client.GetAsync("/mmb/loginMain.do", headers: new Dictionary<string, string> {
+            var loginMainRequest = await Client.GetAsync("/mmb/loginMain.do", headers: new Dictionary<string, string> {
                     { "Referer", "https://m.cultureland.co.kr/index.do" }
                 });
 
             string loginMain = loginMainRequest.Content;
-            string userId = Regex.Match(loginMain, @"<input\s+type=""text""\s+id=""txtUserId""\s+name=""userId""\s+value=""(\w*)""").Groups[1].Value
-                ?? throw new CulturelandError(CulturelandErrorNames.LoginError, "입력하신 로그인 유지 정보는 만료된 정보입니다.");
 
-            var transKey = new MTransKey(client);
+            if (loginMain is null)
+                throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
+
+            string userId = Regex.Match(loginMain, @"<input\s+type=""text""\s+id=""txtUserId""\s+name=""userId""\s+value=""(\w*)""").Groups[1].Value;
+
+            var transKey = new MTransKey(Client);
             var servletData = await transKey.GetServletDataAsync();
             var keypad = transKey.CreateKeypad(servletData, "qwerty", "passwd", "passwd");
             var keypadLayout = await keypad.GetKeypadLayoutAsync();
@@ -112,34 +109,39 @@ namespace cultureland.cs
                 transkey_HM_passwd = encryptedHmac
             };
 
-            var loginRequest = await client.PostAsync("mmb/loginProcess.do", payload, new Dictionary<string, string>() {
+            var loginRequest = await Client.PostAsync("mmb/loginProcess.do", payload, new Dictionary<string, string>() {
                 { "Referer", "https://m.cultureland.co.kr/mmb/loginMain.do"}
             }, allowRedirects: false);
 
             if (loginRequest.StatusCode == HttpStatusCode.OK)
             {
                 string loginData = loginRequest.Content;
+                if (loginData == null)
+                    throw new CulturelandError(CulturelandErrorNames.UnknownError, "잘못된 응답이 반환되었습니다.");
+
                 var errorMessageMatch = Regex.Match(loginData, @"<input type=""hidden"" name=""loginErrMsg""  value=""([^""]+)"" \/>");
                 if (errorMessageMatch.Success)
-                {
-                    throw new CulturelandError(CulturelandErrorNames.LoginError, errorMessageMatch.Groups[1].Value.Replace("\\n\\n", ". "));
-                }
+                    throw new CulturelandError(CulturelandErrorNames.LoginError, errorMessageMatch.Groups[1].Value.Replace(@"\n\n", ". "));
+
                 throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
             }
             var url = loginRequest.GetHeaderValue("Location");
             if (url == "/cmp/authConfirm.do")
             {
-                var errorPageRequest = await client.GetAsync(loginRequest.GetHeaderValue("Location"));
+                var errorPageRequest = await Client.GetAsync(loginRequest.GetHeaderValue("Location"));
                 string errorPage = errorPageRequest.Content;
+
+                if (errorPage is null)
+                    throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
 
                 var errorCodeMatch = Regex.Match(errorPage, @"var errCode = ""(\d+)"";");
                 string errorCode = errorCodeMatch.Success ? errorCodeMatch.Groups[1].Value : null;
                 throw new CulturelandError(CulturelandErrorNames.LoginRestrictedError, $"컬쳐랜드 로그인 정책에 따라 로그인이 제한되었습니다.{(errorCode != null ? $" (제한코드: {errorCode})" : "")}");
             }
-            userInfo = await GetUserInfoAsync();
-            var keepLoginConfigCookie = client.CookieJar.Cookies.Find(x => x.key == "KeepLoginConfig")
+            UserInfo = await GetUserInfoAsync();
+            var keepLoginConfigCookie = Client.CookieJar.Cookies.Find(x => x.key == "KeepLoginConfig")
                 ?? throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
-            this.keepLoginInfo = keepLoginConfigCookie.value;
+            this.KeepLoginInfo = keepLoginConfigCookie.value;
 
             return new CulturelandLogin
             {
@@ -153,22 +155,25 @@ namespace cultureland.cs
             if (!await IsLoginAsync())
                 throw new CulturelandError(CulturelandErrorNames.LoginRequiredError, "로그인이 필요한 서비스 입니다.");
 
-            var BalanceRequest = await client.PostAsync("/tgl/getBalance.json");
+            var BalanceRequest = await Client.PostAsync("/tgl/getBalance.json");
+
+            if (BalanceRequest.Content is null)
+                throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
 
             var BalanceResponse = JObject.Parse(BalanceRequest.Content);
-            if ((string)BalanceResponse["resultMessage"] != "성공")
-            {
-                if (BalanceResponse["resultMessage"] != null)
-                    throw new CulturelandError(CulturelandErrorNames.LookupError, (string)BalanceResponse["resultMessage"]);
-                throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
-            }
 
-            return new CulturelandBalance()
-            {
-                balance = int.Parse((string)BalanceResponse["blnAmt"]),
-                safeBalance = int.Parse((string)BalanceResponse["bnkAmt"]),
-                totalBalance = int.Parse((string)BalanceResponse["myCash"])
-            };
+            if ((string)BalanceResponse["resultMessage"] == "성공")
+                return new CulturelandBalance()
+                {
+                    balance = int.Parse(((string)BalanceResponse["blnAmt"])!),
+                    safeBalance = int.Parse(((string)BalanceResponse["bnkAmt"])!),
+                    totalBalance = int.Parse(((string)BalanceResponse["myCash"])!)
+                };
+
+            if (BalanceResponse["resultMessage"] != null)
+                throw new CulturelandError(CulturelandErrorNames.LookupError, (string)BalanceResponse["resultMessage"]);
+            throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
+
         }
 
         public async Task<CulturelandCharge> ChargeAsync(Pin pin)
@@ -186,11 +191,11 @@ namespace cultureland.cs
 
             bool onlyMobileVouchers = pins.All(pin => pin.Parts[3].Length == 4);
 
-            await client.GetAsync(onlyMobileVouchers
+            await Client.GetAsync(onlyMobileVouchers
                 ? "csh/cshGiftCard.do"
                 : "csh/cshGiftCardOnline.do");
 
-            var transKey = new MTransKey(client);
+            var transKey = new MTransKey(Client);
             var servletData = await transKey.GetServletDataAsync();
 
             var payload = new Dictionary<string, string>
@@ -234,13 +239,13 @@ namespace cultureland.cs
             if (servletData.initTime != payload["initTime"]) throw new Exception("initTime mismatch");
 
 
-            var chargeRequest = await client.PostAsync(
+            var chargeRequest = await Client.PostAsync(
                 onlyMobileVouchers
                     ? "csh/cshGiftCardProcess.do"
                     : "csh/cshGiftCardOnlineProcess.do",
                 body: payload, allowRedirects: false);
 
-            var chargeResultRequest = await client.GetAsync(chargeRequest.GetHeaderValue("Location"));
+            var chargeResultRequest = await Client.GetAsync(chargeRequest.GetHeaderValue("Location"));
             string chargeResult = chargeResultRequest.Content;
             var doc = new HtmlDocument();
             doc.LoadHtml(chargeResult);
@@ -270,17 +275,15 @@ namespace cultureland.cs
             if (amount % 100 != 0 || amount < 1000 || amount > 50000)
                 throw new CulturelandError(CulturelandErrorNames.RangeError, "구매 금액은 최소 1천원부터 최대 5만원까지 100원 단위로 입력 가능합니다.");
 
-            var UserInfo = await GetUserInfoAsync();
-            var GiftPageResponse = await client.GetAsync("gft/gftPhoneApp.do");
+            var userInfo = await GetUserInfoAsync();
+            var GiftPageResponse = await Client.GetAsync("gft/gftPhoneApp.do");
 
             if (GiftPageResponse.GetHeaderValue("Location") == "/ctf/intgAuthBridge.do")
-            {
                 throw new CulturelandError(CulturelandErrorNames.PurchaseRestrictedError, "안전한 컬쳐랜드 서비스 이용을 위해 통합본인인증이 필요합니다.");
-            }
 
             if (phoneNumber == null)
             {
-                var PhoneInfoRequest = await client.PostAsync("cpn/getGoogleRecvInfo.json", new
+                var PhoneInfoRequest = await Client.PostAsync("cpn/getGoogleRecvInfo.json", new
                 {
                     sendType = "LMS",
                     recvType = "M",
@@ -289,21 +292,25 @@ namespace cultureland.cs
                     { "Referer", "https://m.cultureland.co.kr/gft/gftPhoneApp.do"}
                 });
 
-                var PhoneInfo = JObject.Parse(PhoneInfoRequest.Content);
-                if ((string)PhoneInfo["errMsg"] != "정상")
+                if (PhoneInfoRequest.Content != null)
                 {
-                    if (PhoneInfo.ContainsKey("errMsg")) throw new CulturelandError(CulturelandErrorNames.LookupError, (string)PhoneInfo["errMsg"]);
-                    throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
+                    var PhoneInfo = JObject.Parse(PhoneInfoRequest.Content);
+                    if ((string)PhoneInfo["errMsg"] != "정상")
+                    {
+                        if (PhoneInfo.TryGetValue("errMsg", out var errMsg)) 
+                            throw new CulturelandError(CulturelandErrorNames.LookupError, (string)errMsg);
+                        throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
+                    }
+                    phoneNumber = $"{(string)PhoneInfo["hpNo1"]}{(string)PhoneInfo["hpNo2"]}{(string)PhoneInfo["hpNo3"]}";
                 }
-                phoneNumber = $"{(string)PhoneInfo["hpNo1"]}{(string)PhoneInfo["hpNo2"]}{(string)PhoneInfo["hpNo3"]}";
             }
 
 
-            var SendGiftRequest = await client.PostAsync("gft/gftPhoneCashProc.do", new
+            var SendGiftRequest = await Client.PostAsync("gft/gftPhoneCashProc.do", new
             {
                 revEmail = "",
                 sendType = "S",
-                userKey = UserInfo.userKey.ToString(),
+                userKey = userInfo.userKey,
                 limitGiftBank = "N",
                 bankRM = "OK",
                 giftCategory = "M",
@@ -315,11 +322,11 @@ namespace cultureland.cs
                 agree = "on"
             }, allowRedirects: false);
 
-            var GiftResultRequest = await client.PostAsync(SendGiftRequest.GetHeaderValue("location"));
+            var GiftResultRequest = await Client.PostAsync(SendGiftRequest.GetHeaderValue("location"));
 
             string GiftResult = GiftResultRequest.Content;
 
-            if (GiftResult.Contains("<strong> 컬쳐랜드상품권(모바일문화상품권)<br />선물(구매)가 완료되었습니다.</strong>"))
+            if (GiftResult != null && GiftResult.Contains("<strong> 컬쳐랜드상품권(모바일문화상품권)<br />선물(구매)가 완료되었습니다.</strong>"))
             {
                 var barcodeMatch = Regex.Match(GiftResult,
                     @"<input\s+type=""hidden""\s+id=""barcodeImage""\s+name=""barcodeImage""\s+value=""https:\/\/m\.cultureland\.co\.kr\/csh\/mb\.do\?code=([\w\/\+=]+)""\s*\/?>",
@@ -340,22 +347,27 @@ namespace cultureland.cs
                     throw new CulturelandError(CulturelandErrorNames.ResponseError, "선물 결과에서 발행번호를 찾을 수 없습니다.");
 
                 var barcodePath = $"csh/mb.do?code={barcodeCode}";
-                var barcodeDataRequest = await client.GetAsync(barcodePath);
+                var barcodeDataRequest = await Client.GetAsync(barcodePath);
 
                 string barcodeData = barcodeDataRequest.Content;
 
-                string pinCode = barcodeData
-                    .Split("<span>바코드번호</span>")[1]
-                    .Split("</span>")[0]
-                    .Split("<span>")[1];
-
-                return new CulturelandGift()
+                if (barcodeData != null)
                 {
-                    pin = new Pin(pinCode),
-                    url = $"https://m.cultureland.co.kr/{barcodePath}",
-                    controlCode = controlCode,
-                };
+                    string pinCode = barcodeData
+                        .Split("<span>바코드번호</span>")[1]
+                        .Split("</span>")[0]
+                        .Split("<span>")[1];
+
+                    return new CulturelandGift()
+                    {
+                        pin = new Pin(pinCode),
+                        url = $"https://m.cultureland.co.kr/{barcodePath}",
+                        controlCode = controlCode,
+                    };
+                }
             }
+
+            if (GiftResult == null) throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
             var match = Regex.Match(GiftResult, @"<dt class=""two"">실패 사유 <span class=""right"">(.*?)<\/span><\/dt>");
             var failReason = match.Success ? match.Groups[1].Value.Replace("<br>", " ") : null;
 

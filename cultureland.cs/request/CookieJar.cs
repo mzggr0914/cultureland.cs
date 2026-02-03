@@ -100,7 +100,7 @@ namespace cultureland.cs.request
         {
             return string.Join("; ",
                 _cookies
-                    .Where(c => c != null && c.key != null)
+                    .Where(c => c is { key: { } })
                     .Select(c =>
                     {
                         var k = Uri.EscapeDataString(c.key ?? string.Empty);

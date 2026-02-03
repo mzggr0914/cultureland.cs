@@ -11,7 +11,7 @@ namespace cultureland.cs.mTranskey
 {
     public class Keypad
     {
-        private static readonly string BlankHash = "205e36a6fe3b8ccdf6449862cc8fcfce";
+        private const string BlankHash = "205e36a6fe3b8ccdf6449862cc8fcfce";
 
         private static readonly List<string> SpecialChars = new List<string> {
             "`", "~", "!", "@", "#", "$", "%", "^", "&", "*", "(", ")", "-", "_", "=", "+",
@@ -174,6 +174,10 @@ namespace cultureland.cs.mTranskey
             };
 
             var keyIndexResponse = await mTranskey.client.PostAsync("transkeyServlet", content);
+
+            if (keyIndexResponse.Content is null)
+                throw new CulturelandError(CulturelandErrorNames.ResponseError, "잘못된 응답이 반환되었습니다.");
+
             KeyIndex = keyIndexResponse.Content.Trim();
             var query = new Dictionary<string, string>
             {
